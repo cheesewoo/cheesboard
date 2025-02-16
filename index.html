@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>CoBot Dashboard</title>
+		<link rel="stylesheet" type="text/css" href="chessboardJS/css/chessboard-1.0.0.min.css">
+		<link rel="stylesheet" type="text/css" href="style/dashboardStyle.css">
+		
+		<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+		<script type="text/javascript" src = "chessboardJS/js/chessboard-1.0.0.js"></script>
+	</head>
+
+	<body>
+		<h1>Welcome to the Florida Tech Cobot Dashboard!</h1>
+		<h2>Current Game Information</h
+		
+		<!--Div Related to Board Element--> 
+		<div id="myBoard" style="width: 400px">
+			<script type="text/javascript">
+				var board1 = Chessboard('myBoard', 'start');
+			</script>
+		</div>
+		
+		<!-- Rest of Game Info -->
+		<div id="gameInfo">
+			<p>Backend Status: <span id="servCon" style="color: red;">Connection Failed</span></p>
+			<span>Cobot 1 State: <span id="state0">Off</span></span>
+			&emsp;
+			<span>Cobot 2 State: <span id="state1">Off</span></span>
+			<br/><br/>
+			<span>Black's Time Remaining: <span id="timeB">5:00</span></span>
+			&emsp;
+			<span>White's Time Remaining: <span id="timeW">5:00</span></span>
+		</div>
+		
+		<!-- Begin Control Panel Area -->
+		<div id="controlPanel">
+			<h2> --- Cobot Control Panel --- </h2>
+			<!-- New Game Button -->
+			<input type="button" value="Begin New Game" onclick="newGame()">
+			
+			<!-- Cobot Toggling -->
+			<h3>Cobot Arm Toggling</h3>
+			<input type="button" value="Toggle Cobot 0" onclick="toggleBot(0)">
+			<input type="button" value="Toggle Cobot 1" onclick="toggleBot(1)">
+			<br/>
+			<!-- End Cobot Toggle -->
+			
+			<!-- Set Speed -->
+			<h3 style="border-top: 1px dotted; padding-top: 4px;">Set Arm Speed</h3>
+			<form name="setSpeed" method="GET">
+				<input type="radio" id="cobot0" name="botSelect" value="0">
+  				<label for="cobot0">Cobot 0</label>
+				&emsp;
+				<input type="radio" id="cobot1" name="botSelect" value="1">
+  				<label for="cobot1">Cobot 1</label><br>
+				
+				<input type="text" name="speed" placeholder="Enter Speed (Between 0 & 1)">
+				<br/>
+				<input type="button" name="button" id ="speedButton" value="Set Speed" onclick="updateSpeed(this.form)">
+			</form>
+			<!-- End Set Speed -->
+			
+			<!-- Clock Manipulation -->
+			<h3 style="border-top: 1px dotted; padding-top: 4px;">Manipulate Clock</h3>
+			<input type="button" value="+15 Seconds to White" onclick="addTime('white', 15)">
+			<input type="button" value="+15 Seconds to Black" onclick="addTime('black', 15)">
+			<!-- End Clock Manip -->
+			<br/><br/>
+			
+		</div>
+		<!-- End Control Panel -->
+		<br/>
+		
+		<!-- Begin Test area -->
+		<h2>--------- Testing Area: to be removed ---------</h2>
+		<h3>Test board position updating...</h3>
+		<h4>See sample FEN Strings Below:</h4>
+		<p>r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1</p>
+		<p>r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R</p>
+		<p>rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR</p>
+		
+		
+		<form name="stringForm" method="GET">
+			<input type="text" name="fenString" id="fenString" placeholder="Enter a FEN String...">
+			<input type="button" name="button" value="Update Board" onclick="updateBoard(this.form)">
+		</form>
+		
+		<!-- End Test Area -->
+
+		<script type="text/javascript">
+			const ws = new WebSocket("ws://localhost:8080");
+
+			ws.addEventListener("open", () => {
+				console.log("We are connected");
+				//Display connection status to user
+				document.getElementById("servCon").style.color = "green";
+				document.getElementById("servCon").innerHTML = "Connected";
+
+				ws.send(JSON.stringify({ message: "Hello, here's a test message" }));
+
+			});			
+
+			ws.addEventListener("message", e => {
+				const msg = JSON.parse(e.data);
+
+				if (msg.name == "cobot_state"){
+					document.getElementById("state" + msg.cobot_id).innerHTML = msg.state;
+				}
+				else if (msg.name == "time"){
+					document.getElementById("timeW").innerHTML = msg.white_time_left;
+					document.getElementById("timeB").innerHTML = msg.black_time_left;
+				}
+				else{
+					Chessboard('myBoard', msg.full_fen);
+				}
+				
+			});
+
+			function toggleStatus(id){
+				let state = document.getElementById("state" + id).innerHTML;
+				if (state == "Off"){return true;}
+				else if (state == "On"){return false;}
+			}
+			//Control Panel Functions -- Begin
+			// Function for "Cobot Arm Toggling"
+			function toggleBot(id){
+				if (id == 0){
+					let enab0 = toggleStatus(id);
+					const msg = {name:"set_enabled", cobot_id: id, enabled: enab0};
+					const myJson = JSON.stringify(msg);
+					ws.send(myJson);
+				}
+				else if (id == 1){
+					let enab1 = toggleStatus(id);
+					const msg = {name:"set_enabled", cobot_id: id, enabled: enab1};
+					const myJson = JSON.stringify(msg);
+					ws.send(myJson);
+				}
+			}
+			
+			// Function for "Set Arm Speed"
+			function updateSpeed(form){
+				let botSpeed = form.speed.value;
+				let botSelect = form.botSelect.value;
+				if (botSpeed > 1 || botSpeed < 0 || isNaN(botSpeed) || botSpeed == ""){
+					//Ensure valid speed input
+					alert('Invalid value for speed entered.\nValue must be a number between 0 and 1');
+				}
+				else if (botSelect != "0" && botSelect != "1"){
+					//Check for cobot selection
+					alert("No cobot selected.\nPlease try again.")
+				}
+				else{
+					const msg = {name: "set_max_speed", cobot_id: botSelect, speed: botSpeed};
+					const myJson = JSON.stringify(msg);
+					ws.send(myJson);
+				}
+				form.speed.value = "";
+			}
+			
+			// Function to begin new game
+			function newGame(){
+				let text;
+				let baseTime = 0;
+				let incTime = 0;
+
+                console.log("Sending message to backend:");
+				//send a  message to open a console and run bash
+
+
+
+
+				baseTime = prompt("Please enter Base Time (in seconds):");
+				// Check for valid values
+				if (isNaN(baseTime) || baseTime == ""){
+					alert("Invalid Value for base time entered, please try again.")
+					baseTime = null;
+				}
+				else if(baseTime){
+					incTime = prompt("Please enter increment time (in seconds):");
+					if (isNaN(incTime) || incTime == ""){
+						alert("Invalid value for increment time entered, please try again.")
+						incTime = null;
+					}
+				}
+				if (baseTime != null && incTime != null){
+					baseTime *= 1000;
+					incTime *= 1000;
+                    const msg = { name: "new_game", base_time: baseTime, increment_time: incTime, action: "runbash" };   // action: "runbash"
+					myJson = JSON.stringify(msg);	
+					ws.send(myJson);
+				}
+			}
+			function addTime(col, time){
+				timeMs = time * 1000;
+				const msg = {name: "add_time", color: col, time: timeMs}
+				const myJson = JSON.stringify(msg);
+				ws.send(myJson);
+
+			}
+
+			//Control Panel Function -- End
+			function updateBoard(form){
+				let fenString = form.fenString.value;
+				Chessboard('myBoard', fenString);
+			}
+		</script>
+	</body>
+</html>	
