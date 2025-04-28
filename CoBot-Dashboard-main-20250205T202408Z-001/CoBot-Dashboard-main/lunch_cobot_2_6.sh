@@ -2,31 +2,41 @@
 
 echo "Starting COBOT calibration..."
 
-
 cd ..
 cd ..
 cd ..
 cd ..
-
-
 
 python3 - <<EOF
-import io
-import sys
-
-sys.stdin = io.StringIO("init(7)\ncalibrate(0b111111)\nexit\n")
-
 import importlib.util
+import time
+
 script_path = "cobot-ws/src/configuration/ar3-bringup/scripts/test.py"
 spec = importlib.util.spec_from_file_location("test", script_path)
 test = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(test)
+
+test.init(7)
+test.calibrate(0b111111)
+
+time.sleep(60)
+EOF
+
+python3 - <<EOF
+import importlib.util 
+
+script_path = "cobot-ws/src/configuration/ar3-bringup/scripts/test.py"
+spec = importlib.util.spec_from_file_location("test", script_path)
+test = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(test)
+
+test.home(0b111111)
 EOF
 
 echo "COBOT calibration completed successfully."
 
 echo "Connecting to Raspberry Pi..."
-ssh -t -t cobot0@cobot0.local <<EOF
+ssh cobot0@cobot0.local <<EOF
 cd cobot-raspi-ws
 source install/setup.bash
 ros2 launch bringup generic.launch.xml
@@ -58,4 +68,3 @@ echo "set e 1" | ros2 run topic_tester topic_tester
 
 echo "COBOT system started."
 exit 0
-
